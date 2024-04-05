@@ -15,25 +15,36 @@ import rigolClassObjects as AO
 
 #Set up Spectrum Analyzer
 rm=pyvisa.ResourceManager()
-#print(rm.list_resources())
+instr=rm.open_resource("TCPIP::169.254.34.26::INSTR", resource_pyclass=AO.Rigol_SA)
 
-instr=rm.open_resource("TCPIP::169.254.163.226::INSTR", resource_pyclass=AO.Rigol_SA)
-
-query = AO.Rigol_SA.IDquery(instr)
+#Check connection
+#query = AO.Rigol_SA.IDquery(instr)
 #print(query)
 
-AO.Rigol_SA.initialize(instr, 1)
-num_steps = 1
-ask = AO.Rigol_SA.get_freq(instr, num_steps)
+#Set up peak table thresholds
+out = AO.Rigol_SA.peak_setup(instr)
+#print(out)
 
+#Collect frequencies, amplitude, and time
+num_steps = 430000
+freq, amp, t = AO.Rigol_SA.peak_table_read(instr, num_steps)
+
+#print(freq)
+
+#%%
 #Plotting
-time = np.linspace(1, num_steps*0.5, num_steps)
-plt.plot(time, ask)
+#t = np.linspace(1, num_steps*0.01, num_steps)
+"""
+plt.plot(t, freq)
+plt.plot(t, amp)
 plt.ylabel('Frequency (MHz)')
 plt.xlabel('Time (s)')
-
+"""
+#%%
 #Save to CSV
-np.savetxt('one_minute.txt',ask,delimiter=',')
+np.savetxt('2hfreq.txt',freq,delimiter=',')
+np.savetxt('2hamp.txt',amp,delimiter=',')
+np.savetxt('2htime.txt',t,delimiter=',')
 
 
 

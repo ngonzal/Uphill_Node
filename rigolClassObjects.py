@@ -10,6 +10,7 @@ Initial class definitions for the Rigol spectrum analyzer DSA 3000
 import pyvisa
 import time
 import numpy as np
+from tqdm import tqdm
 
 
 def converter(x): return float(x) if (x[0] != '#') else float(x[11:])
@@ -22,17 +23,58 @@ class Rigol_SA(pyvisa.resources.TCPIPInstrument):
         return self.query('*IDN?')
     
     def initialize (self, channel):
-        self.write(':CALCulate:MARKer{}:FCOunt:STATe ON'.format(channel))
-        print(self.query(":CALCulate:MARKer{}:FCOunt:STATe?".format(channel)))
+        self.write(':CALCulate:MARKer{}:FCOunt:STATe 0'.format(channel))
+        #print(self.query(":CALCulate:MARKer{}:FCOunt:STATe?".format(channel)))
     
     def get_freq (self, reps):
-        list = []
-        for x in range(reps):
+        list1 = []
+        list2 = []
+        list3 = []
+        
+        loop_time = time.time()
+        
+        for x in tqdm(range(reps)):
             freq = self.query(':CALCulate:MARKer1:FCOunt:X?')
-            list.append(float(freq))
+            read = self.query(':CALCulate:MARKer1:Y?')
+            list1.append(float(freq))
+            list2.append(float(read))
             time.sleep(.001)
-        return list
+            
+            t_pass = (time.time() - loop_time)
+            list3.append(t_pass)
+            
+        return list1, list2, list3
+    
+    def peak_setup (self):
+        self.write(':CALCulate:MARKer:PEAK:THReshold:STATe ON')
+        self.write(':CALCulate:MARKer:PEAK:EXCursion:STATE ON')
+        self.write(':CALCulate:MARKer:PEAK:EXCursion 1')
+        self.write(':CALCulate:MARKer:PEAK:THReshold -52')
+        self.write(':CALCulate:MARKer:PEAK:SORT AMPLitude')
+        self.write(':FORMat:TRACe:DATA ASCii')
+        self.write(':TRACe:MATH:PEAK:TABLe:STATe ON')
+        self.write(':TRACe:MATH:PEAK:THReshold NORMal')
+        
+        read = self.query(':CALCulate:MARKer:PEAK:THReshold?')
+        return read
 
+    def peak_table_read (self, reps):
+        f = []
+        amp = []
+        t = []
+        loop_time = time.time()
+        
+        for x in tqdm(range(reps)):
+            readout = self.query(':TRACe:MATH:PEAK:DATA?').split(',')
+            if readout[0] != 'error':
+                f.append(float(readout[0]))
+                amp.append(float(readout[1]))
+                t_pass = (time.time() - loop_time)
+                t.append(t_pass)
+            time.sleep(.001)
+        return f, amp, t
+
+    
 class Agilent_Scope(pyvisa.resources.TCPIPInstrument):
     def __init__(self, *args, **kwargs):
         super(Agilent_Scope, self).__init__(*args, **kwargs)
